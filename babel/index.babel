@@ -1,0 +1,207 @@
+//cells have four states "dead" "alive" "newborn" and "newdead"
+var cells = [];
+var width = 50;
+var height = 50;
+//stores interval
+var interval = null;
+
+class Board extends React.Component{
+  constructor(props){
+    super(props);
+    this.state = {
+      running: false,
+      cellsHTML: "",
+      generationCount: 0,
+    };
+  }
+  
+  //generates and populates board
+  componentDidMount(){
+    this.generateCells();
+    this.populateCells();
+    this.takeGenerationalStep();
+    this.toggleInterval();
+  }
+  
+  toggleInterval(){
+    if(!this.state.running){
+      this.setState({
+        running: true,
+      });
+      interval = setInterval(this.takeGenerationalStep.bind(this), 500);
+    } else {
+      this.setState({
+        running: false
+      });
+      clearInterval(interval);
+    }
+  }
+  
+  //populates the cells array with dead cell objects
+  generateCells(){
+    var resultArr = [];
+    cells = [];
+    for(var i = 0; i < height; i++){
+      var rowArr = [];
+      for(var j = 0; j < width; j++){
+        var newCell = {
+          status: "dead",
+          coordY: i,
+          coordX: j,
+        };
+        rowArr.push(newCell);
+      }
+      resultArr.push(rowArr);
+    }
+    cells = resultArr;
+  }
+  
+  //populates cell array with live cells
+  populateCells(){
+    for(var i = 0; i < height; i++){
+      for(var j = 0; j < width; j++){
+        var rand = Math.floor(Math.random() * 100);
+        if(rand >= 70){
+          cells[i][j].status = "alive";
+        }
+      }
+    }
+  }
+  
+  //goes through cells array and moves it forward a generation
+  takeGenerationalStep(){
+    //turns all old newborn cells into "live" cells
+    //turns all old newdead cells into "dead" cells
+    for(var i = 0; i < height; i++){
+      for(var j = 0; j < width; j++){
+        if(cells[i][j].status === "newborn"){
+          cells[i][j].status = "alive";
+        } else if (cells[i][j].status === "newdead"){
+          cells[i][j].status = "dead";
+        }
+      }
+    }
+    
+    /*calculates newborn and newdead cells*/
+    //iterates through each cell
+    for(var i = 0; i < height; i++){
+      for(var j = 0; j < width; j++){
+        var counter = 0;
+        //iterates through a box around each cell
+        for(var k = i - 1; k < height && k <= i + 1; k++){
+          for(var l = j - 1; l < width && l <= j + 1; l++){
+                if(l >= 0 && k >= 0 && (cells[k][l].status === "alive" || cells[k][l].status === "newdead")){
+              counter++;
+              if(cells[i][j].status === "alive" && k === i && j === l){
+                counter--
+              }
+            }
+          }
+        }
+        if(counter === 3 && cells[i][j].status === "dead"){
+            cells[i][j].status = "newborn";
+        } else if((counter > 3 && cells[i][j].status === "alive" || counter < 2) && cells[i][j].status === "alive"){
+            cells[i][j].status = "newdead";
+        }
+      }
+    }
+    this.setState({
+      generationCount: this.state.generationCount + 1,
+    });
+    this.buildCells();
+  }
+  
+  buildCells(){
+      var cellsHTML =
+       cells.map((row) => (
+         <div className="row">
+         {
+           row.map((cell) => (
+             <Cell 
+               cell={cell} 
+               buildCells={this.buildCells.bind(this)}
+               />
+           ))
+         }
+         </div>
+       ));
+    this.setState({
+      cellsHTML: cellsHTML,
+    });
+  }
+  
+  regenerate(){
+    this.setState({
+      generationCount: 0,
+    });
+    this.generateCells();
+    this.populateCells();
+    this.buildCells();
+  }
+  
+  clear(){
+    this.setState({
+      generationCount: 0,
+    });
+    this.generateCells();
+    this.buildCells();
+  }
+  
+  render(){
+    return(
+      <div className="boardWrapper">
+        <div className = "toolbar row">
+          <button className = "btn btn-secondary btn-sm" onClick = {this.toggleInterval.bind(this)}>
+            {this.state.running? "Stop" : "Start"}
+          </button>
+          <button className = "btn btn-secondary btn-sm" onClick = {this.regenerate.bind(this)}>Generate</button>
+          <button className = "btn btn-secondary btn-sm" onClick = {this.clear.bind(this)}>Clear</button>
+          <div className = "generationCountDispWraperr">
+            <p className = "generationCountDisp">{"Generation: " + this.state.generationCount}</p>
+          </div>
+        </div>
+        <div className = "board">
+          {this.state.cellsHTML}
+        </div>
+      </div>
+    )
+  }
+}
+
+//TODO it appears to be returning the correct html idk what 
+class Cell extends React.Component{
+  constructor(props){
+    super(props);
+    this.state = {
+      coordY: this.props.cell.coordY,
+      coordX: this.props.cell.coordX,
+    };
+    this.handleCellClick = this.handleCellClick.bind(this);
+  }
+  
+  getCellClasses(){
+    var classes = this.props.cell.status + " cell";
+    return classes;
+  }
+  
+  handleCellClick(){
+    if(cells[this.state.coordY][this.state.coordX].status === "dead" || cells[this.state.coordY][this.state.coordX] === "newdead"){
+      cells[this.state.coordY][this.state.coordX].status = "newborn";
+    } else if(cells[this.state.coordY][this.state.coordX].status === "alive" || cells[this.state.coordY][this.state.coordX].status === "newborn"){
+      cells[this.state.coordY][this.state.coordX].status = "newdead";
+    }
+    console.log("click");
+    this.props.buildCells();
+  }
+  
+  render(){
+    return(
+      <div className = {this.getCellClasses()} onClick = {this.handleCellClick}></div>
+    )
+  }
+}
+
+ReactDOM.render(
+  <Board />,
+  document.getElementById("root")
+)
